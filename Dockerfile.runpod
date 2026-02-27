@@ -7,7 +7,7 @@ ENV PATH="$FASTAI_VENV/bin:$PATH"
 # Layer 1: All system deps + Node.js (single apt-get update)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        git openssh-client graphviz vim curl wget fonts-noto-cjk && \
+        git openssh-client graphviz vim curl wget fonts-noto-cjk btop && \
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
