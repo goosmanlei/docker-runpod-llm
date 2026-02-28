@@ -54,7 +54,8 @@ RUN git clone https://github.com/goosmanlei/fastai-course-part2.git /root/fastai
     pip install --no-cache-dir --no-build-isolation --no-deps -e /root/course22p2
 
 # Layer 6: Configuration (matplotlib, Jupyter, git, shell, ipykernel)
-RUN mkdir -p /root/.config/matplotlib /root/.jupyter && \
+RUN mkdir -p /root/.config/matplotlib /root/.jupyter \
+        /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
     printf "font.family : Noto Sans CJK SC\naxes.unicode_minus : False\n" \
         > /root/.config/matplotlib/matplotlibrc && \
     { echo "c.ServerApp.ip = '0.0.0.0'"; \
@@ -66,6 +67,8 @@ RUN mkdir -p /root/.config/matplotlib /root/.jupyter && \
       echo "c.ServerApp.disable_check_xsrf = True"; \
       echo "c.ServerApp.root_dir = '/root/fastai-course-part2'"; \
     } > /root/.jupyter/jupyter_lab_config.py && \
+    printf '{\n  "shortcuts": [\n    {\n      "command": "apputils:activate-command-palette",\n      "keys": ["Accel Shift C"],\n      "selector": "body",\n      "disabled": true\n    },\n    {\n      "command": "apputils:activate-command-palette",\n      "keys": ["Accel Alt C"],\n      "selector": "body"\n    }\n  ]\n}\n' \
+        > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/shortcuts.jupyterlab-settings && \
     python -m ipykernel install --name llm-learn --display-name "LLM Learn" && \
     git config --global user.email "leiguoguo.ai@gmail.com" && \
     git config --global user.name "goosmanlei" && \
