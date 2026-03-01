@@ -122,7 +122,6 @@ nest-asyncio==1.6.0
 networkx==3.6.1
 notebook==7.5.4
 notebook_shim==0.2.4
-numpy==2.4.2
 nvidia-dali-cuda120==1.46.0
 nvidia-modelopt==0.23.0
 nvidia-modelopt-core==0.23.0
