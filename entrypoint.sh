@@ -10,8 +10,9 @@ if [ -f "$NVML_VERSIONED" ] && [ ! -e "$NVML_PATH" ]; then
     ln -sf "$NVML_VERSIONED" "$NVML_PATH" 2>/dev/null || true
 fi
 
-# Pull latest course repo on each container start
+# Pull latest course repo as work user
 echo "[entrypoint] Pulling latest fastai-course-part2..."
-git -C /root/fastai-course-part2 pull --ff-only 2>&1 || true
+su -s /bin/bash -c "git -C /home/work/fastai-course-part2 pull --ff-only" work 2>&1 || true
 
-exec "$@"
+# Drop to work user for the main process (gosu preserves signals)
+exec gosu work "$@"

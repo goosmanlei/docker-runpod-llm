@@ -12,85 +12,99 @@ ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=all
 
 # Layer 1: System deps + Node.js
-RUN apt-get update && \
+# Switch Ubuntu apt sources to Aliyun mirror (covers both old sources.list and
+# Ubuntu 24.04's DEB822 *.sources format) before any apt-get update.
+# NodeSource setup runs apt-get update internally; no separate update needed.
+RUN grep -rl 'archive.ubuntu.com\|security.ubuntu.com' /etc/apt/ 2>/dev/null | \
+    xargs -r sed -i \
+        -e 's|http://archive.ubuntu.com/ubuntu|https://mirrors.aliyun.com/ubuntu|g' \
+        -e 's|http://security.ubuntu.com/ubuntu|https://mirrors.aliyun.com/ubuntu|g' && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y --no-install-recommends \
         git openssh-client graphviz vim curl wget fonts-noto-cjk btop \
-        ffmpeg \
-        locales && \
+        ffmpeg gosu sudo \
+        locales nodejs && \
     locale-gen en_US.UTF-8 && \
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# Create venv (--system-site-packages 继承基础镜像中的 PyTorch / CUDA 包)
-RUN python -m venv /root/venvs/llm --system-site-packages
+# Create work user with passwordless sudo
+RUN useradd -m -s /bin/bash work && \
+    echo "work ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-ENV VIRTUAL_ENV=/root/venvs/llm
+ENV VIRTUAL_ENV=/home/work/venvs/llm
+ENV JUPYTERLAB_SETTINGS_DIR=/home/work/.jupyter/lab/user-settings
+ENV MPLCONFIGDIR=/home/work/.config/matplotlib
+
+# Use Aliyun PyPI mirror for all pip installs
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+ENV PIP_TRUSTED_HOST=mirrors.aliyun.com
+
+# Create a clean venv (no --system-site-packages to avoid version conflicts).
+# Then symlink only torch/nvidia/triton packages from the system site-packages into the
+# venv — these are pre-compiled against CUDA and expensive to reinstall. Everything else
+# (fastai, transformers, …) is pip-installed fresh with full dependency resolution.
+RUN gosu work python -m venv $VIRTUAL_ENV && \
+    gosu work $VIRTUAL_ENV/bin/pip install --no-cache-dir -U pip setuptools wheel && \
+    SYSTEM_SP=$(python3 -c "import site; print(site.getsitepackages()[0])") && \
+    VENV_SP=$(echo $VIRTUAL_ENV/lib/python*/site-packages) && \
+    for item in \
+        "$SYSTEM_SP"/torch*  \
+        "$SYSTEM_SP"/torchvision* \
+        "$SYSTEM_SP"/torchaudio* \
+        "$SYSTEM_SP"/torchtext* \
+        "$SYSTEM_SP"/triton* \
+        "$SYSTEM_SP"/nvidia_*; \
+    do \
+        [ -e "$item" ] && ln -sf "$item" "$VENV_SP/$(basename "$item")" || true; \
+    done
+
+# constraints.txt is copied once and shared by all pip layers.
+# Changing it invalidates all pip caches — expected when pinned versions change.
+# An empty constraints.txt means no pinning (first-run / bootstrap mode).
+# To pin: docker run --rm <image> bash -c '$VIRTUAL_ENV/bin/pip freeze --exclude-editable' > constraints.txt
+COPY constraints.txt /tmp/constraints.txt
 
 # Layer 2: fastai 阶段
-# (numpy/scipy/matplotlib/scikit-learn 已在基础镜像中，无需重装)
-# jupyterlab 必须装入 venv，否则 venv/bin/jupyter 不存在
-RUN $VIRTUAL_ENV/bin/pip install --no-cache-dir \
-    jupyterlab \
-    fastai fastcore fastdownload fastbook fastkaggle \
-    nbdev \
-    ipykernel ipywidgets \
-    torcheval timm \
-    seaborn plotly graphviz dtreeviz \
-    sympy networkx
+COPY requirements-fastai.in /tmp/
+RUN gosu work $VIRTUAL_ENV/bin/pip install --no-cache-dir \
+    -c /tmp/constraints.txt -r /tmp/requirements-fastai.in
 
 # Layer 3: HuggingFace LLM 阶段
 # (einops/safetensors/flash_attn 2.7.3 已在基础镜像中，无需重装)
-RUN $VIRTUAL_ENV/bin/pip install --no-cache-dir \
-    transformers \
-    datasets \
-    accelerate \
-    peft \
-    trl \
-    bitsandbytes \
-    sentencepiece \
-    diffusers
+COPY requirements-llm.in /tmp/
+RUN gosu work $VIRTUAL_ENV/bin/pip install --no-cache-dir \
+    -c /tmp/constraints.txt -r /tmp/requirements-llm.in
 
 # Layer 4: Gradio + Claude Code CLI
-RUN $VIRTUAL_ENV/bin/pip install --no-cache-dir gradio && \
-    npm install -g @anthropic-ai/claude-code
+COPY requirements-extra.in /tmp/
+RUN gosu work $VIRTUAL_ENV/bin/pip install --no-cache-dir \
+    -c /tmp/constraints.txt -r /tmp/requirements-extra.in && \
+    npm install -g --registry https://registry.npmmirror.com @anthropic-ai/claude-code
 
 # Layer 5: Clone course repos (placed late — repo updates won't invalidate package cache)
-RUN git clone https://github.com/goosmanlei/fastai-course-part2.git /root/fastai-course-part2 && \
-    git clone https://github.com/fastai/course22p2.git /root/course22p2 && \
-    $VIRTUAL_ENV/bin/pip install --no-cache-dir --no-build-isolation --no-deps -e /root/course22p2
+# gosu work ensures repo directories are owned by work from the start — no chown needed
+RUN gosu work git clone https://github.com/goosmanlei/fastai-course-part2.git /home/work/fastai-course-part2 && \
+    gosu work git clone https://github.com/fastai/course22p2.git /home/work/course22p2 && \
+    gosu work $VIRTUAL_ENV/bin/python -c \
+        "import site; open(site.getsitepackages()[0]+'/course22p2.pth','w').write('/home/work/course22p2\n')"
 
 # Layer 6: Configuration (matplotlib, Jupyter, git, shell, ipykernel)
-RUN mkdir -p /root/.config/matplotlib /root/.jupyter \
-        /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
-    printf "font.family : Noto Sans CJK SC\naxes.unicode_minus : False\n" \
-        > /root/.config/matplotlib/matplotlibrc && \
-    $VIRTUAL_ENV/bin/python -c "import matplotlib.font_manager as fm; fm._load_fontmanager(try_read_cache=False)" && \
-    { echo "c.ServerApp.ip = '0.0.0.0'"; \
-      echo "c.ServerApp.port = 8888"; \
-      echo "c.ServerApp.allow_root = True"; \
-      echo "c.ServerApp.token = ''"; \
-      echo "c.ServerApp.allow_origin = '*'"; \
-      echo "c.ServerApp.allow_remote_access = True"; \
-      echo "c.ServerApp.disable_check_xsrf = True"; \
-      echo "c.ServerApp.root_dir = '/root/fastai-course-part2'"; \
-    } > /root/.jupyter/jupyter_lab_config.py && \
-    printf '{\n  "shortcuts": [\n    {\n      "command": "apputils:activate-command-palette",\n      "keys": ["Accel Shift C"],\n      "selector": "body",\n      "disabled": true\n    },\n    {\n      "command": "apputils:activate-command-palette",\n      "keys": ["Accel Alt C"],\n      "selector": "body"\n    }\n  ]\n}\n' \
-        > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/shortcuts.jupyterlab-settings && \
-    $VIRTUAL_ENV/bin/python -m ipykernel install --sys-prefix --name llm-learn --display-name "LLM Learn" && \
-    git config --global user.email "leiguoguo.ai@gmail.com" && \
-    git config --global user.name "goosmanlei" && \
-    git config --global alias.co checkout && \
-    git config --global alias.br branch && \
-    git config --global alias.ci commit && \
-    git config --global alias.st status && \
-    echo "source $VIRTUAL_ENV/bin/activate" >> /root/.bashrc && \
-    echo '[ -f ~/.bashrc ] && source ~/.bashrc' >> /root/.bash_profile && \
-    chsh -s /bin/bash root
+# Root-only ops run here; work-user config delegated to configure.sh
+COPY configure.sh /configure.sh
+RUN chmod +x /configure.sh && \
+    git config --system user.email "leiguoguo.ai@gmail.com" && \
+    git config --system user.name "goosmanlei" && \
+    git config --system alias.co checkout && \
+    git config --system alias.br branch && \
+    git config --system alias.ci commit && \
+    git config --system alias.st status && \
+    printf 'source %s/bin/activate\n' "$VIRTUAL_ENV" >> /etc/bash.bashrc && \
+    gosu work /configure.sh && \
+    rm /configure.sh
 
 EXPOSE 8888
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["/root/venvs/llm/bin/jupyter", "lab"]
+CMD jupyter lab
