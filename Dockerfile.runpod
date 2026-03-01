@@ -77,13 +77,15 @@ RUN mkdir -p /root/.config/matplotlib /root/.jupyter \
     } > /root/.jupyter/jupyter_lab_config.py && \
     printf '{\n  "shortcuts": [\n    {\n      "command": "apputils:activate-command-palette",\n      "keys": ["Accel Shift C"],\n      "selector": "body",\n      "disabled": true\n    },\n    {\n      "command": "apputils:activate-command-palette",\n      "keys": ["Accel Alt C"],\n      "selector": "body"\n    }\n  ]\n}\n' \
         > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/shortcuts.jupyterlab-settings && \
-    python -m ipykernel install --name llm-learn --display-name "LLM Learn" && \
+    python -m ipykernel install --sys-prefix --name llm-learn --display-name "LLM Learn" && \
     git config --global user.email "leiguoguo.ai@gmail.com" && \
     git config --global user.name "goosmanlei" && \
     git config --global alias.co checkout && \
     git config --global alias.br branch && \
     git config --global alias.ci commit && \
     git config --global alias.st status && \
+    echo 'source /root/venvs/llm/bin/activate' >> /root/.bashrc && \
+    echo '[ -f ~/.bashrc ] && source ~/.bashrc' >> /root/.bash_profile && \
     chsh -s /bin/bash root
 
 EXPOSE 8888
