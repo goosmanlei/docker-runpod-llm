@@ -16,7 +16,7 @@ Two tags are maintained, each corresponding to a different base image:
 | Tag | Base Image | PyTorch | CUDA | Ubuntu |
 |-----|-----------|---------|------|--------|
 | `cu1281` | `runpod/pytorch:1.0.3-cu1281-torch280-ubuntu2404` | 2.8.0 | 12.8.1 | 24.04 |
-| `cu1240` | `runpod/pytorch:0.7.0-cu1241-torch240-ubuntu2204` | 2.4.0 | 12.4.1 | 22.04 |
+| `cu1241` | `runpod/pytorch:0.7.0-cu1241-torch240-ubuntu2204` | 2.4.0 | 12.4.1 | 22.04 |
 
 ```bash
 # cu1281 (default)
@@ -27,7 +27,7 @@ docker build --platform linux/amd64 -f Dockerfile.runpod \
 # cu1240
 docker build --platform linux/amd64 -f Dockerfile.runpod \
   --build-arg BASE_IMAGE=runpod/pytorch:0.7.0-cu1241-torch240-ubuntu2204 \
-  -t goosmanlei/runpod-learn:cu1240 .
+  -t goosmanlei/runpod-learn:cu1241 .
 ```
 
 ## Run (macpod)
