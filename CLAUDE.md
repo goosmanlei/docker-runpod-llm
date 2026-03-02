@@ -11,9 +11,23 @@ This repo contains a Dockerfile for running the [fast.ai course part 2](https://
 
 ## Build
 
+Two tags are maintained, each corresponding to a different base image:
+
+| Tag | Base Image | PyTorch | CUDA | Ubuntu |
+|-----|-----------|---------|------|--------|
+| `cu1281` | `runpod/pytorch:1.0.3-cu1281-torch280-ubuntu2404` | 2.8.0 | 12.8.1 | 24.04 |
+| `cu1240` | `runpod/pytorch:0.7.0-cu1241-torch240-ubuntu2204` | 2.4.0 | 12.4.1 | 22.04 |
+
 ```bash
-# RunPod image (linux/amd64 only — nvcr.io base has no arm64 variant)
-docker build --platform linux/amd64 -f Dockerfile.runpod -t goosmanlei/runpod-learn .
+# cu1281 (default)
+docker build --platform linux/amd64 -f Dockerfile.runpod \
+  --build-arg BASE_IMAGE=runpod/pytorch:1.0.3-cu1281-torch280-ubuntu2404 \
+  -t goosmanlei/runpod-learn:cu1281 .
+
+# cu1240
+docker build --platform linux/amd64 -f Dockerfile.runpod \
+  --build-arg BASE_IMAGE=runpod/pytorch:0.7.0-cu1241-torch240-ubuntu2204 \
+  -t goosmanlei/runpod-learn:cu1240 .
 ```
 
 ## Run (macpod)
@@ -25,7 +39,7 @@ docker build --platform linux/amd64 -f Dockerfile.runpod -t goosmanlei/runpod-le
 
 ## Architecture
 
-`Dockerfile.runpod` is based on `runpod/pytorch:1.0.3-cu1281-torch280-ubuntu2404` (PyTorch 2.8.0, CUDA 12.8.1, Ubuntu 24.04) and sets up:
+`Dockerfile.runpod` uses `ARG BASE_IMAGE` to support multiple tags (default: `runpod/pytorch:1.0.3-cu1281-torch280-ubuntu2404`, PyTorch 2.8.0, CUDA 12.8.1, Ubuntu 24.04) and sets up:
 
 - **`work` user** with passwordless sudo (`gosu` used throughout for user-context ops)
 - **Python venv** at `/home/work/venvs/llm` (clean, no `--system-site-packages`); torch/torchvision/triton/nvidia_* symlinked from system site-packages
