@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/pytorch:25.02-py3
+FROM runpod/pytorch:1.0.3-cu1300-torch290-ubuntu2404
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -22,7 +22,7 @@ RUN grep -rl 'archive.ubuntu.com\|security.ubuntu.com' /etc/apt/ 2>/dev/null | \
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y --no-install-recommends \
         git openssh-client graphviz vim curl wget fonts-noto-cjk btop \
-        ffmpeg gosu sudo \
+        ffmpeg gosu sudo python3-venv \
         locales nodejs && \
     locale-gen en_US.UTF-8 && \
     rm -rf /var/lib/apt/lists/*
@@ -43,7 +43,8 @@ ENV PIP_TRUSTED_HOST=mirrors.aliyun.com
 # Then symlink only torch/nvidia/triton packages from the system site-packages into the
 # venv — these are pre-compiled against CUDA and expensive to reinstall. Everything else
 # (fastai, transformers, …) is pip-installed fresh with full dependency resolution.
-RUN gosu work python -m venv $VIRTUAL_ENV && \
+# runpod/pytorch images install torch system-wide (no transformer_engine/apex/flash_attn).
+RUN gosu work python3 -m venv $VIRTUAL_ENV && \
     gosu work $VIRTUAL_ENV/bin/pip install --no-cache-dir -U pip setuptools wheel && \
     SYSTEM_SP=$(python3 -c "import site; print(site.getsitepackages()[0])") && \
     VENV_SP=$(echo $VIRTUAL_ENV/lib/python*/site-packages) && \
@@ -51,12 +52,8 @@ RUN gosu work python -m venv $VIRTUAL_ENV && \
         "$SYSTEM_SP"/torch*  \
         "$SYSTEM_SP"/torchvision* \
         "$SYSTEM_SP"/torchaudio* \
-        "$SYSTEM_SP"/torchtext* \
         "$SYSTEM_SP"/triton* \
         "$SYSTEM_SP"/numpy* \
-        "$SYSTEM_SP"/flash_attn* \
-        "$SYSTEM_SP"/transformer_engine* \
-        "$SYSTEM_SP"/apex* \
         "$SYSTEM_SP"/nvidia_*; \
     do \
         [ -e "$item" ] && ln -sf "$item" "$VENV_SP/$(basename "$item")" || true; \
@@ -74,7 +71,6 @@ RUN gosu work $VIRTUAL_ENV/bin/pip install --no-cache-dir \
     -c /tmp/constraints.txt -r /tmp/requirements-fastai.in
 
 # Layer 3: HuggingFace LLM + Gradio + Claude Code CLI
-# (einops/safetensors/flash_attn 2.7.3 已在基础镜像中，无需重装)
 COPY requirements-llm.in /tmp/
 RUN gosu work $VIRTUAL_ENV/bin/pip install --no-cache-dir \
     -c /tmp/constraints.txt -r /tmp/requirements-llm.in && \

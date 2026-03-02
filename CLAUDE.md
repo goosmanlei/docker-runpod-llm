@@ -25,7 +25,7 @@ docker build --platform linux/amd64 -f Dockerfile.runpod -t goosmanlei/runpod-fo
 
 ## Architecture
 
-`Dockerfile.runpod` is based on `nvcr.io/nvidia/pytorch:25.02-py3` and sets up:
+`Dockerfile.runpod` is based on `runpod/pytorch:1.0.3-cu1300-torch290-ubuntu2404` (PyTorch 2.9.0, CUDA 13.0, Ubuntu 24.04) and sets up:
 
 - **`work` user** with passwordless sudo (`gosu` used throughout for user-context ops)
 - **Python venv** at `/home/work/venvs/llm` (clean, no `--system-site-packages`); torch/torchvision/triton/nvidia_* symlinked from system site-packages
