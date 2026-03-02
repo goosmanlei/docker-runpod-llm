@@ -2,6 +2,7 @@
 set -e
 
 mkdir -p /home/work/.jupyter/lab/user-settings/@jupyterlab/apputils-extension \
+         /home/work/.jupyter/lab/user-settings/@jupyterlab/shortcuts-extension \
          /home/work/.config/matplotlib
 
 # matplotlib font config
@@ -24,8 +25,8 @@ c.ServerApp.disable_check_xsrf = True
 c.ServerApp.root_dir = '/home/work'
 EOF
 
-# JupyterLab keyboard shortcuts
-cat > /home/work/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/shortcuts.jupyterlab-settings << 'EOF'
+# JupyterLab keyboard shortcuts (JupyterLab 4.x: @jupyterlab/shortcuts-extension)
+cat > /home/work/.jupyter/lab/user-settings/@jupyterlab/shortcuts-extension/shortcuts.jupyterlab-settings << 'EOF'
 {
   "shortcuts": [
     {
