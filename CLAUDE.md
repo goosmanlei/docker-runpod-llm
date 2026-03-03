@@ -22,11 +22,13 @@ Two tags are maintained, each corresponding to a different base image:
 # cu1281 (default)
 docker build --platform linux/amd64 -f Dockerfile.runpod \
   --build-arg BASE_IMAGE=runpod/pytorch:1.0.3-cu1281-torch280-ubuntu2404 \
+  --build-arg CONSTRAINTS_FILE=constraints-cu1281.txt \
   -t goosmanlei/runpod-learn:cu1281 .
 
-# cu1240
+# cu1241
 docker build --platform linux/amd64 -f Dockerfile.runpod \
   --build-arg BASE_IMAGE=runpod/pytorch:0.7.0-cu1241-torch240-ubuntu2204 \
+  --build-arg CONSTRAINTS_FILE=constraints-cu1241.txt \
   -t goosmanlei/runpod-learn:cu1241 .
 ```
 
@@ -39,14 +41,14 @@ docker build --platform linux/amd64 -f Dockerfile.runpod \
 
 ## Architecture
 
-`Dockerfile.runpod` uses `ARG BASE_IMAGE` to support multiple tags (default: `runpod/pytorch:1.0.3-cu1281-torch280-ubuntu2404`, PyTorch 2.8.0, CUDA 12.8.1, Ubuntu 24.04) and sets up:
+`Dockerfile.runpod` uses `ARG BASE_IMAGE` and `ARG CONSTRAINTS_FILE` to support multiple tags (default: `runpod/pytorch:1.0.3-cu1281-torch280-ubuntu2404`, PyTorch 2.8.0, CUDA 12.8.1, Ubuntu 24.04) and sets up:
 
 - **`work` user** with passwordless sudo (`gosu` used throughout for user-context ops)
 - **Python venv** at `/home/work/venvs/llm` (clean, no `--system-site-packages`); torch/torchvision/triton/nvidia_* symlinked from system site-packages
 - **Multi-layer pip install** driven by two requirement files:
   - `requirements-fastai.in` — fastai and related libs (Layer 2)
   - `requirements-llm.in` — HuggingFace transformers, diffusers, Gradio, Claude Code CLI (Layer 3)
-  - `constraints.txt` — pinned versions shared by all layers
+  - `constraints-cu1281.txt` / `constraints-cu1241.txt` — per-tag pinned versions shared by all layers
 - **JupyterLab** on port 8888 (no auth), venv registered as Jupyter kernel via `--user` ipykernel install
 - **Chinese font** support (Noto Sans CJK SC) for matplotlib
 - **Claude Code CLI** via Node.js 22
@@ -55,10 +57,16 @@ docker build --platform linux/amd64 -f Dockerfile.runpod \
 
 ## Dependency Pinning
 
+Each tag has its own constraints file (`constraints-cu1281.txt`, `constraints-cu1241.txt`).
+
 ```bash
-# Regenerate constraints.txt inside a running container:
-docker run --rm <image> bash -c '$VIRTUAL_ENV/bin/pip freeze --exclude-editable' > constraints.txt
+# Regenerate per-tag constraints inside a running container:
+docker run --rm goosmanlei/runpod-learn:cu1281 bash -c \
+  '$VIRTUAL_ENV/bin/pip freeze --exclude-editable' > constraints-cu1281.txt
+
+docker run --rm goosmanlei/runpod-learn:cu1241 bash -c \
+  '$VIRTUAL_ENV/bin/pip freeze --exclude-editable' > constraints-cu1241.txt
 # Then remove lines starting with `[entrypoint]` and any `@ file:///` lines (symlinked packages)
 ```
 
-An empty `constraints.txt` means no pinning (bootstrap mode).
+An empty constraints file means no pinning (bootstrap mode).

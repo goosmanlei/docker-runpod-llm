@@ -1,5 +1,6 @@
 ARG BASE_IMAGE=runpod/pytorch:1.0.3-cu1281-torch280-ubuntu2404
 FROM ${BASE_IMAGE}
+ARG CONSTRAINTS_FILE=constraints-cu1281.txt
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -50,11 +51,11 @@ RUN gosu work python3 -m venv $VIRTUAL_ENV && \
         [ -e "$item" ] && ln -sf "$item" "$VENV_SP/$(basename "$item")" || true; \
     done
 
-# constraints.txt is copied once and shared by all pip layers.
-# Changing it invalidates all pip caches — expected when pinned versions change.
-# An empty constraints.txt means no pinning (first-run / bootstrap mode).
-# To pin: docker run --rm <image> bash -c '$VIRTUAL_ENV/bin/pip freeze --exclude-editable' > constraints.txt
-COPY constraints.txt /tmp/constraints.txt
+# Per-tag constraints file (constraints-cu1281.txt / constraints-cu1241.txt) is copied once
+# and shared by all pip layers. Changing it invalidates all pip caches.
+# An empty file means no pinning (bootstrap mode).
+# To pin: ./build-push-commit.sh --pin
+COPY ${CONSTRAINTS_FILE} /tmp/constraints.txt
 
 # Layer 2: fastai 阶段
 COPY requirements-fastai.in /tmp/
