@@ -1,0 +1,16 @@
+transformers
+datasets
+accelerate
+peft
+trl
+bitsandbytes
+sentencepiece
+tokenizers
+huggingface_hub
+evaluate
+gradio
+diffusers
+optimum
+ipykernel
+ipywidgets
+seaborn

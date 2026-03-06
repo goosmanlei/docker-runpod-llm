@@ -1,0 +1,81 @@
+ARG BASE_IMAGE=runpod/pytorch:1.0.3-cu1281-torch280-ubuntu2404
+FROM ${BASE_IMAGE}
+ARG CONSTRAINTS_FILE=constraints-cu1281.txt
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# UTF-8 locale (required by btop and many terminal tools)
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US:en
+ENV LC_ALL=en_US.UTF-8
+
+# Expose all NVIDIA capabilities (compute + utility provides NVML for btop GPU stats)
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=all
+
+# Layer 1: System deps + Node.js
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y --no-install-recommends \
+        git openssh-client graphviz vim curl wget fonts-noto-cjk btop \
+        ffmpeg gosu sudo python3-venv \
+        locales nodejs && \
+    locale-gen en_US.UTF-8 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create work user with passwordless sudo
+RUN useradd -m -s /bin/bash work && \
+    echo "work ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+ENV VIRTUAL_ENV=/home/work/venvs/llm
+ENV JUPYTERLAB_SETTINGS_DIR=/home/work/.jupyter/lab/user-settings
+ENV MPLCONFIGDIR=/home/work/.config/matplotlib
+ENV HF_HOME=/home/work/.cache/huggingface
+
+# Create a clean venv (no --system-site-packages to avoid version conflicts).
+# Then symlink only torch/nvidia/triton packages from the system site-packages into the
+# venv — these are pre-compiled against CUDA and expensive to reinstall.
+RUN gosu work python3 -m venv $VIRTUAL_ENV && \
+    gosu work $VIRTUAL_ENV/bin/pip install --no-cache-dir -U pip setuptools wheel && \
+    SYSTEM_SP=$(python3 -c "import site; print(site.getsitepackages()[0])") && \
+    VENV_SP=$(echo $VIRTUAL_ENV/lib/python*/site-packages) && \
+    for item in \
+        "$SYSTEM_SP"/torch*  \
+        "$SYSTEM_SP"/torchvision* \
+        "$SYSTEM_SP"/torchaudio* \
+        "$SYSTEM_SP"/triton* \
+        "$SYSTEM_SP"/numpy* \
+        "$SYSTEM_SP"/nvidia_*; \
+    do \
+        [ -e "$item" ] && ln -sf "$item" "$VENV_SP/$(basename "$item")" || true; \
+    done
+
+# Per-tag constraints file (constraints-cu1281.txt / constraints-cu1241.txt) is copied once
+# and shared by all pip layers. Changing it invalidates all pip caches.
+# An empty file means no pinning (bootstrap mode).
+# To pin: ./build-push-commit.sh --pin
+COPY ${CONSTRAINTS_FILE} /tmp/constraints.txt
+
+# Layer 2: HuggingFace LLM course packages + Claude Code CLI
+COPY requirements-hf.in /tmp/
+RUN gosu work $VIRTUAL_ENV/bin/pip install --no-cache-dir \
+    -c /tmp/constraints.txt -r /tmp/requirements-hf.in && \
+    npm install -g @anthropic-ai/claude-code
+
+# Layer 3: Configuration (matplotlib, Jupyter, git, shell, ipykernel)
+COPY configure.sh /configure.sh
+RUN chmod +x /configure.sh && \
+    git config --system user.email "leiguoguo.ai@gmail.com" && \
+    git config --system user.name "goosmanlei" && \
+    git config --system alias.co checkout && \
+    git config --system alias.br branch && \
+    git config --system alias.ci commit && \
+    git config --system alias.st status && \
+    printf 'source %s/bin/activate\n' "$VIRTUAL_ENV" >> /etc/bash.bashrc && \
+    gosu work /configure.sh && \
+    rm /configure.sh
+
+EXPOSE 8888
+
+COPY --chmod=755 entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+CMD $VIRTUAL_ENV/bin/jupyter lab
