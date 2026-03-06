@@ -24,6 +24,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     locale-gen en_US.UTF-8 && \
     rm -rf /var/lib/apt/lists/*
 
+# Layer 1.5: nvtop + btop (available in Ubuntu universe repo)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends nvtop btop && \
+    rm -rf /var/lib/apt/lists/*
+
 # Create work user with passwordless sudo
 RUN useradd -m -s /bin/bash work && \
     echo "work ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
