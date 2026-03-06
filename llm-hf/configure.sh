@@ -11,7 +11,7 @@ printf "font.family : Noto Sans CJK SC\naxes.unicode_minus : False\n" \
 
 # Pre-warm matplotlib font cache
 MPLCONFIGDIR=/home/work/.config/matplotlib \
-    $VIRTUAL_ENV/bin/python -c \
+    $CONDA_ENV_PATH/bin/python -c \
     "import matplotlib.font_manager as fm; fm._load_fontmanager(try_read_cache=False)"
 
 # JupyterLab server config
@@ -44,6 +44,6 @@ cat > /home/work/.jupyter/lab/user-settings/@jupyterlab/shortcuts-extension/shor
 }
 EOF
 
-# Register venv as a kernel for system JupyterLab.
+# Register conda env as a kernel for system JupyterLab.
 # --user installs to ~/.local/share/jupyter/kernels/ which system jupyter discovers automatically.
-$VIRTUAL_ENV/bin/python -m ipykernel install --user --name llm-hf --display-name "LLM HF"
+$CONDA_ENV_PATH/bin/python -m ipykernel install --user --name llm-hf --display-name "llm-hf"
