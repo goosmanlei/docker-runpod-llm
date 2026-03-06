@@ -29,6 +29,7 @@ RUN useradd -m -s /bin/bash work && \
     echo "work ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 ENV CONDA_ROOT=/home/work/miniforge3
+ENV MAMBA_ROOT_PREFIX=/home/work/miniforge3
 ENV CONDA_ENV_PATH=/home/work/miniforge3/envs/llm-hf
 ENV JUPYTERLAB_SETTINGS_DIR=/home/work/.jupyter/lab/user-settings
 ENV MPLCONFIGDIR=/home/work/.config/matplotlib

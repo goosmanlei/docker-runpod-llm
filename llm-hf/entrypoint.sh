@@ -14,12 +14,12 @@ if [ -f "$NVML_VERSIONED" ] && [ ! -e "$NVML_PATH" ]; then
 fi
 
 # Clone or pull HuggingFace LLM course repo as work user
-if [ ! -d /home/work/llm-course/.git ]; then
-    echo "[entrypoint] Cloning llm-course..."
-    gosu work git clone https://github.com/huggingface/llm-course.git /home/work/llm-course || true
+if [ ! -d /home/work/llm-hf/.git ]; then
+    echo "[entrypoint] Cloning llm-hf..."
+    gosu work git clone https://github.com/goosmanlei/llm-hf.git /home/work/llm-hf || true
 else
-    echo "[entrypoint] Pulling latest llm-course..."
-    gosu work git -C /home/work/llm-course pull --ff-only 2>&1 || true
+    echo "[entrypoint] Pulling latest llm-hf..."
+    gosu work git -C /home/work/llm-hf pull --ff-only 2>&1 || true
 fi
 
 # Drop to work user for the main process (gosu preserves signals)
