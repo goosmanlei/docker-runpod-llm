@@ -6,7 +6,7 @@
 #          Does NOT push or commit — review the files, then run normally.
 set -euo pipefail
 
-IMAGE="goosmanlei/runpod-learn"
+IMAGE="goosmanlei/runpod-learn-fastai"
 
 TAGS=(
     "cu1281:runpod/pytorch:1.0.3-cu1281-torch280-ubuntu2404:constraints-cu1281.txt"
