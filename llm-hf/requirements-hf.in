@@ -15,3 +15,5 @@ optimum
 ipykernel
 ipywidgets
 seaborn
+scikit-learn
+scipy
